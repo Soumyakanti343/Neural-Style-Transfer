@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Style Transfer</title>
+    <!-- Bootstrap -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    >
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet"
+    >
+    <!-- Custom CSS -->
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <canvas id="neuralCanvas"></canvas>
+
+    <div class="scanlines"></div>
+
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+
+    <!-- ================= NAVBAR ================= -->
+
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-brain me-2"></i>
+                NeuralArt
+            </a>
+
+            <button class="navbar-toggler navbar-dark" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+
+                <ul class="navbar-nav ms-auto">
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Home</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Gallery</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Features</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Pricing</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Contact</a>
+                    </li>
+
+                </ul>
+
+                <a
+                    href="#"
+                    class="btn btn-sm btn-outline-light ms-3 rounded-pill px-4"
+                >
+                    Sign In
+                </a>
+
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- ================= HEADER ================= -->
+
+    <div class="header-section">
+
+        <div class="container">
+
+            <h1 class="display-4 fw-bold">
+                STYLEFORGE AI
+            </h1>
+
+            <p class="lead typing-text">
+                Redefine Reality with AI-Powered Artistry
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= MAIN CONTENT ================= -->
+
+    <div class="container mb-5 fade-in-up">
+
+        <form
+            method="post"
+            enctype="multipart/form-data"
+            id="uploadForm"
+        >
+
+            {{ form.hidden_tag() }}
+
+
+            <!-- ================= IMAGE UPLOAD ================= -->
+
+            <div class="row g-4">
+
+                <!-- Content Image -->
+
+                <div class="col-md-6">
+
+                    <div class="card h-100">
+
+                        <div class="card-header text-center py-3">
+                            Content Source
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <div
+                                class="preview-image mb-3"
+                                id="contentPreview"
+                            >
+
+                                {% if content_image %}
+
+                                    <img
+                                        src="{{ url_for('send_image', filename=content_image) }}"
+                                        alt="Content Image"
+                                    >
+
+                                {% else %}
+
+                                    <span>
+                                        Select Content Image
+                                    </span>
+
+                                {% endif %}
+
+                            </div>
+
+                            {{ form.content(
+                                class="form-control",
+                                onchange="previewFile(this, 'contentPreview')"
+                            ) }}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Style Image -->
+
+                <div class="col-md-6">
+
+                    <div class="card h-100">
+
+                        <div class="card-header text-center py-3">
+                            Style Reference
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <div
+                                class="preview-image mb-3"
+                                id="stylePreview"
+                            >
+
+                                {% if style_image %}
+
+                                    <img
+                                        src="{{ url_for('send_image', filename=style_image) }}"
+                                        alt="Style Image"
+                                    >
+
+                                {% else %}
+
+                                    <span>
+                                        Select Style Image
+                                    </span>
+
+                                {% endif %}
+
+                            </div>
+
+                            {{ form.style(
+                                class="form-control",
+                                onchange="previewFile(this, 'stylePreview')"
+                            ) }}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================= CONTROLS ================= -->
+
+            <div class="row justify-content-center mt-4">
+
+                <div class="col-md-8">
+
+                    <div class="range-wrap">
+
+                        <label
+                            for="alphaRange"
+                            class="form-label fw-bold mb-3 d-block text-center range-label"
+                        >
+                            STYLE STRENGTH
+                        </label>
+
+                        <div class="position-relative">
+
+                            <div
+                                class="range-value"
+                                id="rangeValue"
+                            >
+                                1.0
+                            </div>
+
+                            {{ form.alpha(
+                                class="form-control-range",
+                                id="alphaRange",
+                                type="range",
+                                min="0",
+                                max="1",
+                                step="0.1"
+                            ) }}
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="text-center mt-5">
+
+                        {{ form.submit(
+                            class="btn btn-primary shadow-lg btn-glow"
+                        ) }}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </form>
+
+
+        <!-- ================= RESULT ================= -->
+
+        {% if result_image %}
+
+        <div
+            class="row justify-content-center mt-5"
+            id="resultSection"
+        >
+
+            <div class="col-md-8">
+
+                <div class="card border-success">
+
+                    <div
+                        class="card-header bg-success text-white fw-bold text-center py-3 result-header"
+                    >
+                        Stylized Result
+                    </div>
+
+                    <div class="card-body p-0">
+
+                        <img
+                            src="{{ url_for('send_image', filename=result_image) }}"
+                            class="img-fluid w-100 result-image"
+                            alt="Stylized Image"
+                        >
+
+                    </div>
+
+                    <div class="card-footer text-center result-footer">
+
+                        <a
+                            href="{{ url_for('send_image', filename=result_image) }}"
+                            download
+                            class="btn btn-outline-light mt-2"
+                        >
+                            Download Result
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+        <!-- ================= ERROR ================= -->
+
+        {% if error %}
+
+        <div
+            class="alert alert-danger mt-4 text-center error-alert"
+            role="alert"
+        >
+            <strong>Error:</strong> {{ error }}
+        </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- ================= EXAMPLES ================= -->
+
+    <section class="container examples-section fade-in-up">
+
+        <div class="card">
+
+            <div class="card-header text-center py-3">
+                Examples
+            </div>
+
+            <div class="card-body">
+
+                <p class="text-center text-muted mb-4">
+                    Each example shows the content image, the style below it,
+                    and the final output beside them.
+                </p>
+
+
+                <!-- Example 1 -->
+
+                <div class="row g-4">
+
+                    <div class="col-12">
+
+                        <div class="example-flow">
+
+                            <div class="example-inputs">
+
+                                <div>
+
+                                    <div class="example-role text-center">
+                                        Content Image
+                                    </div>
+
+                                    <img
+                                        src="{{ url_for('send_example', filename='App My Image.png') }}"
+                                        alt="Content Image"
+                                        class="example-image"
+                                    >
+
+                                </div>
+
+
+                                <div>
+
+                                    <div class="example-role text-center">
+                                        Style Image
+                                    </div>
+
+                                    <img
+                                        src="{{ url_for('send_example', filename='la_muse.jpg') }}"
+                                        alt="Sketch Style"
+                                        class="example-image"
+                                    >
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="example-arrow">
+                                →
+                            </div>
+
+
+                            <div class="example-output">
+
+                                <div class="example-role text-center">
+                                    Output
+                                </div>
+
+                                <img
+                                    src="{{ url_for('send_example', filename='stylized_App_My_Image.png') }}"
+                                    alt="Stylized Result"
+                                    class="example-image"
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Example 2 -->
+
+                    <div class="col-12">
+
+                        <div class="example-flow">
+
+                            <div class="example-inputs">
+
+                                <div>
+
+                                    <div class="example-role text-center">
+                                        Content Image
+                                    </div>
+
+                                    <img
+                                        src="{{ url_for('send_example', filename='Group Image NIT DGP.jpeg') }}"
+                                        alt="Brad Pitt Content"
+                                        class="example-image"
+                                    >
+
+                                </div>
+
+
+                                <div>
+
+                                    <div class="example-role text-center">
+                                        Style Image
+                                    </div>
+
+                                    <img
+                                        src="{{ url_for('send_example', filename='19928.jpg') }}"
+                                        alt="Picasso Seated Nude Style"
+                                        class="example-image"
+                                    >
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="example-arrow">
+                                →
+                            </div>
+
+
+                            <div class="example-output">
+
+                                <div class="example-role text-center">
+                                    Output
+                                </div>
+
+                                <img
+                                    src="{{ url_for('send_example', filename='stylized_Group_Image_NIT_DGP.jpeg') }}"
+                                    alt="Brad Pitt Picasso Result"
+                                    class="example-image"
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ================= FAQ ================= -->
+
+    <section class="container faq-section fade-in-up">
+
+        <div class="card">
+
+            <div class="card-header text-center py-3">
+                Frequently Asked Questions
+            </div>
+
+            <div class="card-body">
+
+                <div
+                    class="accordion"
+                    id="faqAccordion"
+                >
+
+                    <!-- FAQ 1 -->
+
+                    <div class="accordion-item">
+
+                        <h2
+                            class="accordion-header"
+                            id="faqHeadingOne"
+                        >
+
+                            <button
+                                class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqOne"
+                                aria-expanded="false"
+                                aria-controls="faqOne"
+                            >
+                                1. Is it a pretrained model?
+                            </button>
+
+                        </h2>
+
+                        <div
+                            id="faqOne"
+                            class="accordion-collapse collapse"
+                            aria-labelledby="faqHeadingOne"
+                            data-bs-parent="#faqAccordion"
+                        >
+
+                            <div class="accordion-body">
+                                No, I trained the model myself using PyTorch and a custom neural style transfer architecture.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FAQ 2 -->
+
+                    <div class="accordion-item">
+
+                        <h2
+                            class="accordion-header"
+                            id="faqHeadingTwo"
+                        >
+
+                            <button
+                                class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqTwo"
+                                aria-expanded="false"
+                                aria-controls="faqTwo"
+                            >
+                                2. How does StyleForge AI transform images?
+                            </button>
+
+                        </h2>
+
+                        <div
+                            id="faqTwo"
+                            class="accordion-collapse collapse"
+                            aria-labelledby="faqHeadingTwo"
+                            data-bs-parent="#faqAccordion"
+                        >
+
+                            <div class="accordion-body">
+                                It extracts content and style features from the input images and generates a new stylized image using the trained model.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FAQ 3 -->
+
+                    <div class="accordion-item">
+
+                        <h2
+                            class="accordion-header"
+                            id="faqHeadingThree"
+                        >
+
+                            <button
+                                class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqThree"
+                                aria-expanded="false"
+                                aria-controls="faqThree"
+                            >
+                                3. Which styles of painting can be used?
+                            </button>
+
+                        </h2>
+
+                        <div
+                            id="faqThree"
+                            class="accordion-collapse collapse"
+                            aria-labelledby="faqHeadingThree"
+                            data-bs-parent="#faqAccordion"
+                        >
+
+                            <div class="accordion-body">
+                                You can use almost any painting style image
+                                (impressionist, abstract, cubist, watercolor,
+                                sketch, and more) as the style reference.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FAQ 4 -->
+
+                    <div class="accordion-item">
+
+                        <h2
+                            class="accordion-header"
+                            id="faqHeadingFour"
+                        >
+
+                            <button
+                                class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqFour"
+                                aria-expanded="false"
+                                aria-controls="faqFour"
+                            >
+                                4. Tech stack of the project?
+                            </button>
+
+                        </h2>
+
+                        <div
+                            id="faqFour"
+                            class="accordion-collapse collapse"
+                            aria-labelledby="faqHeadingFour"
+                            data-bs-parent="#faqAccordion"
+                        >
+
+                            <div class="accordion-body">
+                                Python, PyTorch, Flask.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FAQ 5 -->
+
+                    <div class="accordion-item">
+                        <h2
+                            class="accordion-header"
+                            id="faqHeadingFive"
+                        >
+                            <button
+                                class="accordion-button collapsed"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#faqFive"
+                                aria-expanded="false"
+                                aria-controls="faqFive"
+                            >
+                                5. Which dataset / how big data?
+                            </button>
+
+                        </h2>
+
+                        <div id="faqFive" class="accordion-collapse collapse" aria-labelledby="faqHeadingFive" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                The model is trained on large-scale image
+                                datasets.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="footer-section">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <h5>
+                        <i class="fas fa-brain me-2"></i>
+                        NeuralArt
+                    </h5>
+
+                    <p class="mb-4">
+                        "Every artist dips his brush in his own soul, and
+                        paints his own nature into his pictures."
+                    </p>
+
+                    <p class="small text-muted">
+                        Empowering creators with state-of-the-art AI tools
+                        to reimagine reality through the lens of artistic
+                        expression.
+                    </p>
+
+                </div>
+
+                <div class="col-lg-2 col-md-6">
+                    <h5>Quick Links</h5>
+                    <a href="#" class="footer-link">Home</a>
+                    <a href="#" class="footer-link">About Me</a>
+                    <a href="#" class="footer-link">Showcase</a>
+                    <a href="#" class="footer-link">API Docs</a>
+                </div>
+
+
+                <div class="col-lg-3 col-md-6">
+                    <h5>Contact Me</h5>
+                    <p class="mb-2">
+                        <i class="fas fa-map-marker-alt me-2"></i>
+                        Jalpaiguri, West Bengal
+                    </p>
+                    <p class="mb-2">
+                        <i class="fas fa-envelope me-2"></i>
+                        upadhyaysoumyakanti@gmail.com
+                    </p>
+                    <p class="mb-2">
+                        <i class="fas fa-phone me-2"></i>
+                        +91 8597688956
+                    </p>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <h5>Follow Me</h5>
+                    <!--My Profiles-->
+                    <div class="d-flex mb-3">
+
+                        <!-- LinkedIn -->
+                        <a href="https://www.linkedin.com/in/soumya-kanti-upadhyay-466b272b5/" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+
+                        <!-- GitHub -->
+                        <a href="https://github.com/Soumyakanti343" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+                            <i class="fab fa-github"></i>
+                        </a>
+
+                        <!-- LeetCode -->
+                        <a href="https://leetcode.com/u/SoumyaKanti16/" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="LeetCode">
+                            <i class="fas fa-code"></i>
+                        </a>
+
+                        <!-- CodeChef -->
+                        <a href="https://www.codechef.com/users/soumyakanti16"
+                        class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="CodeChef">
+                            <i class="fas fa-laptop-code"></i>
+                        </a>
+
+                </div>
+
+                    <p class="small text-muted">
+                        Code. Create. Innovate. Building the future with AI.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <hr class="my-4" style="border-color: rgba(255,255,255,0.1);">
+
+
+            <div class="text-center text-muted small">
+                &copy; 2026 StyleForge AI. Built with passion by Soumya Kanti Upadhyay.
+            </div>
+
+        </div>
+
+    </footer>
+
+
+    <!-- ================= LOADER ================= -->
+
+    <div class="loader-overlay" id="loader">
+        <div class="cyber-spinner mb-4"></div>
+        <h3 class="text-white processing-title">
+            PROCESSING
+        </h3>
+        <p class="text-muted">
+            Neural Network is dreaming...
+        </p>
+
+    </div>
+
+
+    <!-- Bootstrap JavaScript -->
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
+
+
+
+
+
+
