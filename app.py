@@ -1,38 +1,21 @@
 import os
-import uuid
-
+import requests
 import torch
-from flask import (
-    Flask,
-    render_template,
-    request,
-    send_from_directory
-)
+
+from flask import Flask, render_template, request, send_from_directory
 from flask_wtf import FlaskForm
-from wtforms import FileField, SubmitField, FloatField, HiddenField
+from flask_bootstrap import Bootstrap
 from werkzeug.utils import secure_filename
+from wtforms import FileField, SubmitField, FloatField, HiddenField
 from PIL import Image
 from torchvision import transforms
-from huggingface_hub import hf_hub_download
 
 from utils.models import VGGEncoder, Decoder
 from utils.utils import adaptive_instance_normalization
 
 
 # =========================================================
-# Flask Application
-# =========================================================
-
-app = Flask(__name__)
-
-app.config["SECRET_KEY"] = os.environ.get(
-    "SECRET_KEY",
-    "neural-style-transfer-secret-key"
-)
-
-
-# =========================================================
-# Project Paths
+# BASE DIRECTORIES
 # =========================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -46,106 +29,91 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # =========================================================
-# Hugging Face Model Repository
+# MODEL PATHS
 # =========================================================
 
-# Replace this with your actual Hugging Face repository.
-HF_REPO_ID = "https://huggingface.co/soumyacodes16/neural-style-transfer-model"
-
-
-VGG_FILENAME = "vgg_normalised.pth"
-DECODER_FILENAME = "decoder_final.pth"
+VGG_PATH = os.path.join(MODEL_DIR, "vgg_normalised.pth")
+DECODER_PATH = os.path.join(MODEL_DIR, "decoder_final.pth")
 
 
 # =========================================================
-# Model Paths
+# HUGGING FACE MODEL URLS
 # =========================================================
 
-VGG_PATH = os.path.join(MODEL_DIR, VGG_FILENAME)
-DECODER_PATH = os.path.join(MODEL_DIR, DECODER_FILENAME)
-
-
-def download_models():
-    """
-    Download model files from Hugging Face if they are not
-    already available locally.
-    """
-
-    global VGG_PATH, DECODER_PATH
-
-    # Download VGG model
-    if not os.path.exists(VGG_PATH):
-
-        print("Downloading VGG model from Hugging Face...")
-
-        VGG_PATH = hf_hub_download(
-            repo_id=HF_REPO_ID,
-            filename=VGG_FILENAME,
-            local_dir=MODEL_DIR
-        )
-
-        print("VGG model downloaded.")
-
-
-    # Download Decoder model
-    if not os.path.exists(DECODER_PATH):
-
-        print("Downloading decoder model from Hugging Face...")
-
-        DECODER_PATH = hf_hub_download(
-            repo_id=HF_REPO_ID,
-            filename=DECODER_FILENAME,
-            local_dir=MODEL_DIR
-        )
-
-        print("Decoder model downloaded.")
-
-
-# =========================================================
-# Device
-# =========================================================
-
-device = torch.device(
-    "cuda" if torch.cuda.is_available() else "cpu"
+HF_BASE_URL = (
+    "https://huggingface.co/"
+    "soumyacodes16/neural-style-transfer-model/"
+    "resolve/main/"
 )
 
-print(f"Using device: {device}")
+VGG_URL = HF_BASE_URL + "vgg_normalised.pth"
+DECODER_URL = HF_BASE_URL + "decoder_final.pth"
 
 
 # =========================================================
-# Download Models
+# DOWNLOAD MODEL
 # =========================================================
 
-download_models()
+def download_model(url, destination):
+    if os.path.exists(destination):
+        print(f"Model already exists: {destination}")
+        return
+
+    print(f"Downloading model from Hugging Face...")
+    print(url)
+
+    response = requests.get(url, stream=True, timeout=300)
+    response.raise_for_status()
+
+    total_size = int(response.headers.get("content-length", 0))
+    downloaded = 0
+
+    with open(destination, "wb") as file:
+
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+
+            if chunk:
+
+                file.write(chunk)
+                downloaded += len(chunk)
+
+                if total_size:
+                    percentage = downloaded * 100 / total_size
+                    print(
+                        f"\rDownloading: {percentage:.1f}%",
+                        end=""
+                    )
+
+    print("\nDownload completed.")
 
 
 # =========================================================
-# Load Models
+# DOWNLOAD REQUIRED MODELS
 # =========================================================
 
-print("Loading VGG encoder...")
-
-encoder = VGGEncoder(VGG_PATH).to(device)
-
-print("Loading decoder...")
-
-decoder = Decoder().to(device)
-
-decoder.load_state_dict(
-    torch.load(
-        DECODER_PATH,
-        map_location=device
-    )
-)
-
-encoder.eval()
-decoder.eval()
-
-print("Models loaded successfully.")
+download_model(VGG_URL, VGG_PATH)
+download_model(DECODER_URL, DECODER_PATH)
 
 
 # =========================================================
-# Upload Form
+# FLASK APP
+# =========================================================
+
+app = Flask(__name__)
+
+app.config["SECRET_KEY"] = "supersecretkey"
+app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
+app.config["ALLOWED_EXTENSIONS"] = {
+    "png",
+    "jpg",
+    "jpeg"
+}
+
+Bootstrap(app)
+
+
+# =========================================================
+# FORM
 # =========================================================
 
 class UploadForm(FlaskForm):
@@ -169,29 +137,59 @@ class UploadForm(FlaskForm):
 
 
 # =========================================================
-# Allowed File Extensions
+# DEVICE
 # =========================================================
 
-ALLOWED_EXTENSIONS = {
-    "png",
-    "jpg",
-    "jpeg"
-}
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
 
+print("Using device:", device)
+
+
+# =========================================================
+# LOAD MODELS
+# =========================================================
+
+print("Loading VGG encoder...")
+
+encoder = VGGEncoder(
+    VGG_PATH
+).to(device)
+
+print("Loading decoder...")
+
+decoder = Decoder().to(device)
+
+decoder.load_state_dict(
+    torch.load(
+        DECODER_PATH,
+        map_location=device
+    )
+)
+
+encoder.eval()
+decoder.eval()
+
+print("Models loaded successfully.")
+
+
+# =========================================================
+# ALLOWED FILE
+# =========================================================
 
 def allowed_file(filename):
 
     return (
         "." in filename
-        and filename.rsplit(
-            ".",
-            1
-        )[1].lower() in ALLOWED_EXTENSIONS
+        and
+        filename.rsplit(".", 1)[1].lower()
+        in app.config["ALLOWED_EXTENSIONS"]
     )
 
 
 # =========================================================
-# Style Transfer
+# STYLE TRANSFER
 # =========================================================
 
 def style_transfer(
@@ -213,10 +211,8 @@ def style_transfer(
         style_image
     ).unsqueeze(0).to(device)
 
-
     with torch.no_grad():
 
-        # Extract VGG features
         content_features = encoder(
             content_tensor,
             is_test=True
@@ -227,100 +223,75 @@ def style_transfer(
             is_test=True
         )
 
-
-        # Adaptive Instance Normalization
-        stylized_features = adaptive_instance_normalization(
-            content_features,
-            style_features
+        stylized_features = (
+            adaptive_instance_normalization(
+                content_features,
+                style_features
+            )
         )
 
-
-        # Blend original content and stylized features
         stylized_features = (
             alpha * stylized_features
-            + (1 - alpha) * content_features
+            +
+            (1 - alpha) * content_features
         )
 
-
-        # Decode image
-        stylized_image = decoder(
+        output = decoder(
             stylized_features
         )
 
-
-    return stylized_image
+    return output
 
 
 # =========================================================
-# Save Image
+# SAVE IMAGE
 # =========================================================
 
 def save_image(image, path):
 
-    image = image.detach().cpu()
+    image = image.cpu().clone()
 
     image = image.squeeze(0)
 
-    image = image.clamp(
-        0,
-        1
-    )
+    image = image.clamp(0, 1)
 
-    image = transforms.ToPILImage()(
-        image
-    )
+    image = transforms.ToPILImage()(image)
 
     image.save(path)
 
 
 # =========================================================
-# Home / Style Transfer Route
+# HOME
 # =========================================================
 
-@app.route(
-    "/",
-    methods=["GET", "POST"]
-)
+@app.route("/", methods=["GET", "POST"])
 def index():
 
     form = UploadForm()
 
     result_image = None
-
     content_filename = None
-
     style_filename = None
-
     error = None
-
 
     if form.validate_on_submit():
 
-        # -------------------------------------------------
-        # Content Image
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # CONTENT IMAGE
+        # ---------------------------------------------
 
         if (
             form.content.data
-            and form.content.data.filename
+            and
+            form.content.data.filename
         ):
 
-            if not allowed_file(
+            if allowed_file(
                 form.content.data.filename
             ):
 
-                error = "Invalid content image format."
-
-            else:
-
-                original_name = secure_filename(
+                content_filename = secure_filename(
                     form.content.data.filename
-                )
-
-                # Unique filename prevents collisions
-                content_filename = (
-                    f"{uuid.uuid4().hex}_"
-                    f"{original_name}"
                 )
 
                 content_path = os.path.join(
@@ -343,63 +314,49 @@ def index():
             )
 
 
-        # -------------------------------------------------
-        # Style Image
-        # -------------------------------------------------
-
-        if not error:
-
-            if (
-                form.style.data
-                and form.style.data.filename
-            ):
-
-                if not allowed_file(
-                    form.style.data.filename
-                ):
-
-                    error = "Invalid style image format."
-
-                else:
-
-                    original_name = secure_filename(
-                        form.style.data.filename
-                    )
-
-                    style_filename = (
-                        f"{uuid.uuid4().hex}_"
-                        f"{original_name}"
-                    )
-
-                    style_path = os.path.join(
-                        UPLOAD_DIR,
-                        style_filename
-                    )
-
-                    form.style.data.save(
-                        style_path
-                    )
-
-                    form.style_path.data = (
-                        style_filename
-                    )
-
-            else:
-
-                style_filename = (
-                    form.style_path.data
-                )
-
-
-        # -------------------------------------------------
-        # Perform Style Transfer
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # STYLE IMAGE
+        # ---------------------------------------------
 
         if (
-            not error
-            and content_filename
-            and style_filename
+            form.style.data
+            and
+            form.style.data.filename
         ):
+
+            if allowed_file(
+                form.style.data.filename
+            ):
+
+                style_filename = secure_filename(
+                    form.style.data.filename
+                )
+
+                style_path = os.path.join(
+                    UPLOAD_DIR,
+                    style_filename
+                )
+
+                form.style.data.save(
+                    style_path
+                )
+
+                form.style_path.data = (
+                    style_filename
+                )
+
+        else:
+
+            style_filename = (
+                form.style_path.data
+            )
+
+
+        # ---------------------------------------------
+        # STYLE TRANSFER
+        # ---------------------------------------------
+
+        if content_filename and style_filename:
 
             content_path = os.path.join(
                 UPLOAD_DIR,
@@ -413,7 +370,6 @@ def index():
 
             try:
 
-                # Open images
                 content_image = Image.open(
                     content_path
                 ).convert("RGB")
@@ -422,37 +378,18 @@ def index():
                     style_path
                 ).convert("RGB")
 
-
-                # Get alpha
                 alpha = float(
                     form.alpha.data
-                    if form.alpha.data is not None
-                    else 1.0
                 )
 
-
-                # Keep alpha between 0 and 1
-                alpha = max(
-                    0.0,
-                    min(
-                        1.0,
-                        alpha
-                    )
-                )
-
-
-                # Generate stylized image
                 stylized_image = style_transfer(
                     content_image,
                     style_image,
                     alpha
                 )
 
-
-                # Result filename
                 result_filename = (
-                    "stylized_"
-                    + content_filename
+                    "stylized_" + content_filename
                 )
 
                 result_path = os.path.join(
@@ -460,43 +397,23 @@ def index():
                     result_filename
                 )
 
-
-                # Save result
                 save_image(
                     stylized_image,
                     result_path
                 )
 
-
                 result_image = result_filename
-
 
             except Exception as e:
 
-                print(
-                    "Style transfer error:",
-                    e
-                )
+                error = str(e)
 
-                error = (
-                    "An error occurred while "
-                    "processing the images."
-                )
+        else:
 
-
-        elif not error:
-
-            if not content_filename:
-
-                error = (
-                    "Please upload a content image."
-                )
-
-            elif not style_filename:
-
-                error = (
-                    "Please upload a style image."
-                )
+            error = (
+                "Please upload both content "
+                "and style images."
+            )
 
 
     return render_template(
@@ -510,12 +427,10 @@ def index():
 
 
 # =========================================================
-# Uploaded Images
+# UPLOADED IMAGES
 # =========================================================
 
-@app.route(
-    "/uploads/<filename>"
-)
+@app.route("/uploads/<filename>")
 def send_image(filename):
 
     return send_from_directory(
@@ -525,12 +440,10 @@ def send_image(filename):
 
 
 # =========================================================
-# Example Images
+# EXAMPLE IMAGES
 # =========================================================
 
-@app.route(
-    "/examples/<path:filename>"
-)
+@app.route("/examples/<path:filename>")
 def send_example(filename):
 
     return send_from_directory(
@@ -540,20 +453,18 @@ def send_example(filename):
 
 
 # =========================================================
-# Run Application
+# RUN
 # =========================================================
 
 if __name__ == "__main__":
 
-    port = int(
-        os.environ.get(
-            "PORT",
-            5000
-        )
-    )
-
     app.run(
         host="0.0.0.0",
-        port=port,
+        port=int(
+            os.environ.get(
+                "PORT",
+                5000
+            )
+        ),
         debug=False
     )
