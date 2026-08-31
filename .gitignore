@@ -1,11 +1,76 @@
-.DS_Store
-**/.DS_Store
-
-
+# Python
 __pycache__/
-**/__pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environment
+venv/
+env/
+.venv/
+ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+
+# Flask
+instance/
+.webassets-cache/
+
+# Uploaded Images
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Training Data
+content_data/
+style_data/
+training_data/
+datasets/
+
+# Training Outputs
+experiment/
+experiments/
+checkpoints/
+outputs/
+
+# PyTorch Model Files
+*.pth
+*.pt
+*.ckpt
+*.bin
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+
+# Python Packaging
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Test / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
 
-# User uploaded images
-static/uploads/
