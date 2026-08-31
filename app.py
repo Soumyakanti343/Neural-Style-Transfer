@@ -50,7 +50,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # =========================================================
 
 # Replace this with your actual Hugging Face repository.
-HF_REPO_ID = "YOUR_USERNAME/neural-style-transfer-models"
+HF_REPO_ID = "https://huggingface.co/soumyacodes16/neural-style-transfer-model"
 
 
 VGG_FILENAME = "vgg_normalised.pth"
