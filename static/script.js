@@ -1,377 +1,369 @@
-/* =========================================================
-   IMAGE PREVIEW
-========================================================= */
+document.addEventListener("DOMContentLoaded", function () {
 
-function previewFile(input, previewId) {
-    const preview = document.getElementById(previewId);
-    const file = input.files[0];
+    /* =========================================================
+       IMAGE PREVIEW
+    ========================================================= */
 
-    if (!file) {
-        return;
-    }
+    function previewFile(input, previewId) {
+        const preview = document.getElementById(previewId);
 
-    const reader = new FileReader();
-    reader.addEventListener("load", function () {
-        preview.innerHTML = `
-            <img
-                src="${reader.result}"
-                alt="Image Preview"
-            >
-        `;
+        if (!preview || !input.files || !input.files[0]) {
+            return;
+        }
 
-    }, false);
-    reader.readAsDataURL(file);
-}
+        const file = input.files[0];
 
+        // Check whether the selected file is an image
+        if (!file.type.startsWith("image/")) {
+            preview.innerHTML = `
+                <span class="text-danger">
+                    Please select a valid image file.
+                </span>
+            `;
+            return;
+        }
 
-/* =========================================================
-   PAGE LOAD
-========================================================= */
+        const reader = new FileReader();
 
-window.addEventListener("load", function () {
-
-    /* -----------------------------------------------------
-       Scroll to result after processing
-    ----------------------------------------------------- */
-
-    const resultSection =
-        document.getElementById("resultSection");
-
-    if (resultSection) {
-        resultSection.scrollIntoView({
-            behavior: "smooth"
+        reader.addEventListener("load", function (event) {
+            preview.innerHTML = `
+                <img 
+                    src="${event.target.result}" 
+                    alt="Image Preview"
+                >
+            `;
         });
 
+        reader.readAsDataURL(file);
     }
 
 
-    /* =====================================================
-       NEURAL NETWORK BACKGROUND
-    ===================================================== */
+    /* =========================================================
+       CONTENT IMAGE PREVIEW
+    ========================================================= */
 
-    const canvas =
-        document.getElementById("neuralCanvas");
+    const contentInput = document.querySelector(
+        'input[name="content"]'
+    );
 
-    if (!canvas) {
-        return;
-    }
-
-    const ctx =
-        canvas.getContext("2d");
-
-    let width;
-    let height;
-
-    let particles = [];
-
-    let mouse = {
-        x: null,
-        y: null,
-        radius: 150
-    };
-
-
-    /* -----------------------------------------------------
-       Canvas Resize
-    ----------------------------------------------------- */
-
-    function resize() {
-        width =
-            canvas.width =
-            window.innerWidth;
-
-        height =
-            canvas.height =
-            window.innerHeight;
+    if (contentInput) {
+        contentInput.addEventListener("change", function () {
+            previewFile(this, "contentPreview");
+        });
     }
 
 
-    /* =====================================================
-       PARTICLE CLASS
-    ===================================================== */
+    /* =========================================================
+       STYLE IMAGE PREVIEW
+    ========================================================= */
 
-    class Particle {
-        constructor() {
+    const styleInput = document.querySelector(
+        'input[name="style"]'
+    );
 
-            this.x =
-                Math.random() * width;
+    if (styleInput) {
+        styleInput.addEventListener("change", function () {
+            previewFile(this, "stylePreview");
+        });
+    }
 
-            this.y =
-                Math.random() * height;
 
-            this.vx =
-                (Math.random() - 0.5) * 0.5;
+    /* =========================================================
+       NEURAL NETWORK CANVAS
+    ========================================================= */
 
-            this.vy =
-                (Math.random() - 0.5) * 0.5;
+    const canvas = document.getElementById("neuralCanvas");
 
-            this.size =
-                Math.random() * 3 + 1.5;
+    if (canvas) {
 
-            this.hue =
-                Math.floor(Math.random() * 10) * 36;
+        const ctx = canvas.getContext("2d");
 
-            this.density =
-                Math.random() * 30 + 1;
+        let width;
+        let height;
+        let particles = [];
+
+        const mouse = {
+            x: null,
+            y: null,
+            radius: 150
+        };
+
+
+        /* -----------------------------------------------------
+           RESIZE CANVAS
+        ----------------------------------------------------- */
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
         }
 
 
-        /* -------------------------------------------------
-           Update Particle
-        ------------------------------------------------- */
+        /* -----------------------------------------------------
+           PARTICLE CLASS
+        ----------------------------------------------------- */
 
-        update() {
-            this.x += this.vx;
-            this.y += this.vy;
+        class Particle {
 
-            /* Mouse Interaction */
-            if (mouse.x !== null) {
-                const dx =
-                    mouse.x - this.x;
+            constructor() {
 
-                const dy =
-                    mouse.y - this.y;
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
 
-                const distance =
-                    Math.sqrt(
-                        dx * dx +
-                        dy * dy
-                    );
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+
+                this.size = Math.random() * 3 + 1.5;
+
+                this.hue = Math.floor(Math.random() * 10) * 36;
+
+                this.density =
+                    Math.random() * 30 + 1;
+            }
 
 
-                if (
-                    distance < mouse.radius &&
-                    distance !== 0
-                ) {
+            update() {
 
-                    const forceDirectionX =
-                        dx / distance;
+                this.x += this.vx;
+                this.y += this.vy;
 
-                    const forceDirectionY =
-                        dy / distance;
 
-                    const force =
-                        (mouse.radius - distance) /
-                        mouse.radius;
+                /* Mouse interaction */
 
-                    const directionX =
-                        forceDirectionX *
-                        force *
-                        this.density;
+                if (mouse.x !== null && mouse.y !== null) {
 
-                    const directionY =
-                        forceDirectionY *
-                        force *
-                        this.density;
+                    const dx = mouse.x - this.x;
+                    const dy = mouse.y - this.y;
 
-                    this.x -= directionX;
-                    this.y -= directionY;
+                    const distance =
+                        Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < mouse.radius && distance > 0) {
+
+                        const forceDirectionX =
+                            dx / distance;
+
+                        const forceDirectionY =
+                            dy / distance;
+
+                        const force =
+                            (mouse.radius - distance) /
+                            mouse.radius;
+
+                        const directionX =
+                            forceDirectionX *
+                            force *
+                            this.density;
+
+                        const directionY =
+                            forceDirectionY *
+                            force *
+                            this.density;
+
+                        this.x -= directionX;
+                        this.y -= directionY;
+                    }
                 }
+
+
+                /* Screen boundaries */
+
+                if (this.x < 0 || this.x > width) {
+                    this.vx *= -1;
+                }
+
+                if (this.y < 0 || this.y > height) {
+                    this.vy *= -1;
+                }
+
+
+                /* Slowly change particle color */
+
+                this.hue =
+                    (this.hue + 0.2) % 360;
             }
 
 
-            /* Boundary Collision */
+            draw() {
 
-            if (
-                this.x < 0 ||
-                this.x > width
-            ) {
-                this.vx *= -1;
+                ctx.fillStyle =
+                    `hsla(${this.hue}, 70%, 60%, 0.3)`;
+
+                ctx.beginPath();
+
+                ctx.arc(
+                    this.x,
+                    this.y,
+                    this.size,
+                    0,
+                    Math.PI * 2
+                );
+
+                ctx.fill();
             }
+        }
 
-            if (
-                this.y < 0 ||
-                this.y > height
-            ) {
-                this.vy *= -1;
+
+        /* -----------------------------------------------------
+           INITIALIZE PARTICLES
+        ----------------------------------------------------- */
+
+        function initParticles() {
+
+            particles = [];
+
+            /*
+             * Number of particles depends on
+             * screen width.
+             */
+
+            const particleCount =
+                Math.floor(window.innerWidth / 15);
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
             }
-
-
-            /* Color Animation */
-            this.hue =
-                (this.hue + 0.2) % 360;
         }
 
 
-        /* -------------------------------------------------
-           Draw Particle
-        ------------------------------------------------- */
+        /* -----------------------------------------------------
+           DRAW CONNECTIONS
+        ----------------------------------------------------- */
 
-        draw() {
+        function drawConnections() {
 
-            ctx.fillStyle =
-                `hsla(
-                    ${this.hue},
-                    70%,
-                    60%,
-                    0.3
-                )`;
-
-            ctx.beginPath();
-
-            ctx.arc(
-                this.x,
-                this.y,
-                this.size,
-                0,
-                Math.PI * 2
-            );
-
-            ctx.fill();
-        }
-    }
-
-
-    /* =====================================================
-       INITIALIZE PARTICLES
-    ===================================================== */
-
-    function initParticles() {
-        particles = [];
-
-        const numParticles =
-            Math.floor(
-                window.innerWidth / 15
-            );
-
-        for (
-            let i = 0;
-            i < numParticles;
-            i++
-        ) {
-
-            particles.push(
-                new Particle()
-            );
-        }
-    }
-
-
-    /* =====================================================
-       ANIMATION LOOP
-    ===================================================== */
-
-    function animate() {
-        ctx.clearRect(
-            0,
-            0,
-            width,
-            height
-        );
-
-
-        particles.forEach(
-            (particle, index) => {
-                particle.update();
-                particle.draw();
-
-
-                /* Connect nearby particles */
+            for (let i = 0; i < particles.length; i++) {
 
                 for (
-                    let j = index + 1;
+                    let j = i + 1;
                     j < particles.length;
                     j++
                 ) {
 
-                    const particle2 =
-                        particles[j];
+                    const p1 = particles[i];
+                    const p2 = particles[j];
 
                     const distance =
                         Math.hypot(
-                            particle.x -
-                            particle2.x,
-
-                            particle.y -
-                            particle2.y
+                            p1.x - p2.x,
+                            p1.y - p2.y
                         );
 
-
                     if (distance < 100) {
+
                         ctx.strokeStyle =
                             `hsla(
-                                ${particle.hue},
+                                ${p1.hue},
                                 70%,
                                 60%,
-                                ${
-                                    0.15 *
-                                    (1 - distance / 100)
-                                }
+                                ${0.15 * (1 - distance / 100)}
                             )`;
 
                         ctx.lineWidth = 1;
+
                         ctx.beginPath();
+
                         ctx.moveTo(
-                            particle.x,
-                            particle.y
+                            p1.x,
+                            p1.y
                         );
+
                         ctx.lineTo(
-                            particle2.x,
-                            particle2.y
+                            p2.x,
+                            p2.y
                         );
+
                         ctx.stroke();
                     }
                 }
             }
+        }
+
+
+        /* -----------------------------------------------------
+           ANIMATION LOOP
+        ----------------------------------------------------- */
+
+        function animate() {
+
+            ctx.clearRect(
+                0,
+                0,
+                width,
+                height
+            );
+
+            particles.forEach(function (particle) {
+
+                particle.update();
+                particle.draw();
+
+            });
+
+            drawConnections();
+
+            requestAnimationFrame(animate);
+        }
+
+
+        /* -----------------------------------------------------
+           MOUSE EVENTS
+        ----------------------------------------------------- */
+
+        window.addEventListener(
+            "mousemove",
+            function (event) {
+
+                mouse.x = event.clientX;
+                mouse.y = event.clientY;
+
+            }
         );
 
 
-        requestAnimationFrame(
-            animate
+        window.addEventListener(
+            "mouseout",
+            function () {
+
+                mouse.x = null;
+                mouse.y = null;
+
+            }
         );
+
+
+        /* -----------------------------------------------------
+           WINDOW RESIZE
+        ----------------------------------------------------- */
+
+        window.addEventListener(
+            "resize",
+            function () {
+
+                resizeCanvas();
+                initParticles();
+
+            }
+        );
+
+
+        /* Start animation */
+
+        resizeCanvas();
+        initParticles();
+        animate();
     }
 
 
-    /* =====================================================
-       WINDOW EVENTS
-    ===================================================== */
-
-    window.addEventListener(
-        "resize",
-        function () {
-
-            resize();
-
-            initParticles();
-
-        }
-    );
-
-
-    window.addEventListener(
-        "mousemove",
-        function (event) {
-            mouse.x =
-                event.clientX;
-
-            mouse.y =
-                event.clientY;
-        }
-    );
-
-
-    /* =====================================================
-       START NEURAL BACKGROUND
-    ===================================================== */
-
-    resize();
-    initParticles();
-    animate();
-
-
-    /* =====================================================
-       RANGE SLIDER
-    ===================================================== */
+    /* =========================================================
+       ALPHA / STYLE STRENGTH SLIDER
+    ========================================================= */
 
     const range =
-        document.getElementById(
-            "alphaRange"
-        );
+        document.getElementById("alphaRange");
 
     const rangeValue =
-        document.getElementById(
-            "rangeValue"
-        );
+        document.getElementById("rangeValue");
 
 
     function updateRange() {
@@ -380,57 +372,53 @@ window.addEventListener("load", function () {
             return;
         }
 
-        const val =
-            range.value;
+        const value =
+            parseFloat(range.value);
 
         const min =
-            range.min || 0;
+            parseFloat(range.min) || 0;
 
         const max =
-            range.max || 1;
-
+            parseFloat(range.max) || 1;
 
         const percentage =
-            ((val - min) * 100) /
+            ((value - min) * 100) /
             (max - min);
 
 
         /* Update displayed value */
 
         rangeValue.textContent =
-            val;
+            value.toFixed(1);
 
 
-        /* Position value bubble */
+        /* Move value bubble */
 
         const thumbWidth = 24;
+
         const offset =
             thumbWidth / 2 -
             (percentage * thumbWidth / 100);
 
         rangeValue.style.left =
-            `calc(
-                ${percentage}% +
-                ${offset}px
-            )`;
+            `calc(${percentage}% + ${offset}px)`;
 
 
-        /* Update slider gradient */
+        /* Update slider background */
 
         range.style.background =
             `linear-gradient(
                 to right,
                 #818cf8 0%,
                 #c084fc ${percentage}%,
-                rgba(30, 41, 59, 0.8)
-                ${percentage}%,
-                rgba(30, 41, 59, 0.8)
-                100%
+                rgba(30, 41, 59, 0.8) ${percentage}%,
+                rgba(30, 41, 59, 0.8) 100%
             )`;
     }
 
 
     if (range) {
+
         range.addEventListener(
             "input",
             updateRange
@@ -439,8 +427,183 @@ window.addEventListener("load", function () {
         updateRange();
     }
 
+
+    /* =========================================================
+       SHOW RANGE VALUE ON HOVER
+    ========================================================= */
+
+    const rangeWrap =
+        document.querySelector(".range-wrap");
+
+    if (rangeWrap && rangeValue) {
+
+        rangeWrap.addEventListener(
+            "mouseenter",
+            function () {
+                rangeValue.style.opacity = "1";
+            }
+        );
+
+        rangeWrap.addEventListener(
+            "mouseleave",
+            function () {
+                rangeValue.style.opacity = "0";
+            }
+        );
+    }
+
+
+    /* =========================================================
+       LOADING OVERLAY
+    ========================================================= */
+
+    const uploadForm =
+        document.getElementById("uploadForm");
+
+    const loader =
+        document.getElementById("loader");
+
+
+    if (uploadForm && loader) {
+
+        uploadForm.addEventListener(
+            "submit",
+            function (event) {
+
+                /*
+                 * Only show loader when both
+                 * images have been selected.
+                 */
+
+                const content =
+                    document.querySelector(
+                        'input[name="content"]'
+                    );
+
+                const style =
+                    document.querySelector(
+                        'input[name="style"]'
+                    );
+
+
+                if (
+                    content &&
+                    style &&
+                    content.files.length > 0 &&
+                    style.files.length > 0
+                ) {
+
+                    loader.classList.add("active");
+                }
+            }
+        );
+    }
+
+
+    /* =========================================================
+       RESULT SECTION AUTO SCROLL
+    ========================================================= */
+
+    const resultSection =
+        document.getElementById("resultSection");
+
+    if (resultSection) {
+
+        setTimeout(function () {
+
+            resultSection.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
+
+        }, 300);
+    }
+
+
+    /* =========================================================
+       NAVBAR SCROLL EFFECT
+    ========================================================= */
+
+    const navbar =
+        document.querySelector(".navbar");
+
+    if (navbar) {
+
+        window.addEventListener(
+            "scroll",
+            function () {
+
+                if (window.scrollY > 50) {
+
+                    navbar.classList.add(
+                        "navbar-scrolled"
+                    );
+
+                } else {
+
+                    navbar.classList.remove(
+                        "navbar-scrolled"
+                    );
+                }
+            }
+        );
+    }
+
+
+    /* =========================================================
+       FADE-IN ANIMATION
+    ========================================================= */
+
+    const fadeElements =
+        document.querySelectorAll(".fade-in-up");
+
+    if ("IntersectionObserver" in window) {
+
+        const observer =
+            new IntersectionObserver(
+                function (entries) {
+
+                    entries.forEach(function (entry) {
+
+                        if (entry.isIntersecting) {
+
+                            entry.target.style.opacity = "1";
+                            entry.target.style.transform =
+                                "translateY(0)";
+
+                            observer.unobserve(
+                                entry.target
+                            );
+                        }
+
+                    });
+
+                },
+                {
+                    threshold: 0.1
+                }
+            );
+
+
+        fadeElements.forEach(function (element) {
+            observer.observe(element);
+        });
+
+    } else {
+
+        /*
+         * Fallback for older browsers
+         */
+
+        fadeElements.forEach(function (element) {
+
+            element.style.opacity = "1";
+            element.style.transform =
+                "translateY(0)";
+
+        });
+    }
+
 });
-
-
 
 
